@@ -5,13 +5,7 @@
 
 This repo contains a workflow used to generate a dataset to be included
 into GBIF rpository. The workflow was done using R wth `target` and
-`tarchetypes` pkgs.
-
-You can see the workflow in the following
-
-``` r
-cat(c("```mermaid", tar_mermaid(), "```"), sep = "\n")
-```
+`tarchetypes` pkgs. You can see here:
 
 ``` mermaid
 graph LR
@@ -148,3 +142,12 @@ graph LR
   linkStyle 114 stroke-width:0px;
   linkStyle 115 stroke-width:0px;
 ```
+
+## Credits
+
+- **Data Set**: Ana Belén Robles Cruz, María Eugenia Ramos-Font,
+  Mauro J. Tognetti Barbieri, Antonio J. Pérez-Luque, Clara Montoya
+  Román, Claudia Tribaldos Anda. 2023.
+
+- **repository & code:** [Antonio J.
+  Pérez-Luque](https://github.com/ajpelu)
