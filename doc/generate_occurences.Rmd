@@ -1,0 +1,36 @@
+---
+title: "Genera *Occurrences*"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "..")
+options(tidyverse.quiet = TRUE)
+```
+
+
+```{r, echo=FALSE}
+library(targets)
+library(DT)
+library(knitr)
+library(readr)
+library(glue)
+```
+
+## Occurrences de los datos de abundancia
+
+```{r, echo=FALSE}
+tar_load(occ_abundances)
+
+DT::datatable(occ_abundances,
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+

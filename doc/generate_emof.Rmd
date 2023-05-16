@@ -1,0 +1,258 @@
+---
+title: "Genera *Extended Measurement Or Fact*"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "..")
+options(tidyverse.quiet = TRUE)
+```
+
+
+```{r, echo=FALSE}
+library(targets)
+library(DT)
+library(knitr)
+library(readr)
+library(glue)
+library(DiagrammeR)
+```
+
+## Introducción 
+Para preparar el archivo *Extended Measurement Or Fact* vamos a usar un diccionario de variables, que está localizado en `/data/raw_data/dic_variables_serpam.xlsx` 
+
+Un vistazo de la tabla de variables: 
+
+```{r, echo=FALSE}
+tar_load(file_dic_variables)
+tar_load(prepara_variables)
+
+
+DT::datatable(prepara_variables,
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+
+## Generar emof para datos de **transectos**
+
+El esquema que hemos seguido para este apartado ha consistido en: 
+
+- Leer los diferentes archivos con los datos de los transectos
+- Combinar todos los archivos excel tras aplicar algunas modificaciones 
+- Preparar el objeto de datos de transectos. 
+
+```{r, echo=FALSE, warning=FALSE}
+tar_visnetwork(names = one_of("read_transects_data",
+                              "combina_tr", 
+                              "prepara_tr", 
+                              "prepare_transects"), 
+               exclude = c(starts_with("genera_"),
+                           starts_with("event_"), 
+                           starts_with("get_"),
+                           starts_with("prepare_taxa"),
+                           starts_with("prepare_variables"),
+                           starts_with("prepare_taxa"),
+                           starts_with("check_new_taxa"),
+                           starts_with("read_abundance"),
+                           starts_with("print_sql"),
+                           starts_with("read_occurrences"),
+                           ),
+                           
+            shortcut = FALSE, targets_only = FALSE)
+```
+
+
+### Lectura de archivos.
+
+Leemos todos los archivos generados de los transectos. Estos datos han sido generados utilizando diferentes consultas SQL a la base de datos: 
+
+- SQL para generar datos de Suelo Desnudo
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_desnudo)
+sql_desnudo
+```
+
+que genera el archivo: `data/raw_data/transectos/desnudo.xlsx`
+
+- SQL para generar datos de Musgo Líquen
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_musgo_liquen)
+sql_musgo_liquen
+```
+
+que genera el archivo: `data/raw_data/transectos/musgo_liquen.xlsx`
+
+- SQL para generar datos de Recubrimiento Total 
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_rec_total)
+sql_rec_total
+```
+
+que genera el archivo: `data/raw_data/transectos/recubrimiento_total.xlsx`
+
+- SQL para generar datos de Recubrimiento Vegetal
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_rec_vegetal)
+sql_rec_vegetal
+```
+
+que genera el archivo: `data/raw_data/transectos/recubrimiento_vegetal.xlsx`
+
+- SQL para generar datos de Riqueza
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_riqueza)
+sql_riqueza
+```
+
+que genera el archivo: `data/raw_data/transectos/riqueza.xlsx`
+
+- SQL para generar datos de Diversidad 
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_diversidad)
+sql_diversidad
+```
+
+que genera el archivo: `data/raw_data/transectos/diversidad.xlsx`. 
+
+### Combinación y preparación de datos de partida
+
+Una vez importados los archivos se combinan y se genera un solo dataframe con todas las variables. Se sustituyen los nombres de las varibles por las indicadas en el diccionario de variables (`/data/raw_data/dic_variables_serpam.xlsx`). Para ello se sigue la siguiente correspondencia con el diccionario de variables (`dic_variables_serpam.xlsx`): 
+
+- "% de suelo desnudo". Corresponde con la varaible `v24` 
+
+- "% de musgo-líquen". Corresponde con la varaible `v28` 
+
+- "% de recubrimiento total". Corresponde con la varaible `v06` 
+
+- Variable: "% de recubrimiento vegetal". Corresponde con la varaible `v03` 
+
+- Variable: "Riqueza". Corresponde con la varaible `v03`
+
+- Variable: "Diversidad". Corresponde con la varaible `v17`
+
+
+### Generar emof de Transectos 
+A partir del conjunto de datos anterior, se formatean los datos de acuerdo con el estándar DwC y se genera un dataframe llamado `emof_transectos` con los datos de las variables tomadas para cada transecto. La tabla se exporta en csv en el siguiente enlace [`data/dwc_db/emof_transectos.csv`](data/dwc_db/emof_transectos.csv). Aspecto de la tabla: 
+```{r, echo=FALSE}
+tar_load(emof_transects)
+DT::datatable(emof_transects,
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+
+Asimismo se genera un archivo llamado event_transects que se exportará para la generación del los eventos. 
+
+Todo el flujo de trabajo puede verse en el siguiente esquema 
+
+```{r, echo=FALSE, warning=FALSE}
+tar_visnetwork(names = one_of("read_transects_data",
+                              "combina_tr", 
+                              "prepara_tr", 
+                              "prepare_transects", 
+                              "event_transects",
+                              "emof_transects", 
+                              "my_csv_files", 
+                              "event_transects", 
+                              "genera_event_transect_aux"), 
+               exclude = c(
+                           starts_with("get_"),
+                           # starts_with("prepare_variables"),
+                           starts_with("print_sql"),
+                           starts_with("raw_densidad"),
+                           starts_with("geo_"),
+                           starts_with("file_raw"),
+                           starts_with("taxonomy"),
+                           # starts_with("event_spat"),
+                           "genera_event_transects",
+                          # "event_spatial",
+                           contains("abundance"),
+                           contains("wkt"),
+                           contains("taxa"),
+                           contains("event_dic"),
+                           contains("aux"), 
+                           contains("subplot"), 
+                           contains("spat")
+               ),
+               
+               shortcut = FALSE, targets_only = FALSE)
+
+
+
+
+```
+
+
+## Prepara ExtendedMeasurementOrFact (emof) de abundancias 
+
+Para obtener los datos de abundancias, en la base de datos original, se ha ejecutado la siguiente consulta: 
+
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_abundance)
+sql_abundance
+```
+
+
+Usando los datos de los eventos generados a partir de los datos de abundancias, vamos a generar un objeto con los datos de emof para las abundancias dentro de los cuadrados. En concreto: 
+
+```{r, echo=FALSE, warning=FALSE}
+tar_visnetwork(names = c(one_of(
+  "file_raw_densidad", 
+  "raw_densidad"),contains("abundance")),
+  exclude = c(contains("occ"), 
+              contains("taxonomy"),
+              starts_with("print_sql"),
+              contains("report"), 
+              contains("taxa"),
+              contains("transect"), 
+              contains("wkt"),
+              contains("aux"), 
+              "prepare_variables_dicc", 
+              "sql_abundance",
+              "genera_event_dic", 
+              "event_spatial", 
+              "mapped"
+    
+  ),
+  
+  shortcut = FALSE, targets_only = FALSE)
+```
+
+- Los valores de abundancia se expresaran en la variable `measurementValue`
+- Formateamos el campo fecha para que aparezca en formato `YYYYMMDD` y generamos una variable llamada `measurementDeterminedDate`
+- Para generar los eventos consideraremos que cada cuadrado de 50 x 50 son subreplicas, puesto que no podemos asegurar que lo etiquetado en la base de datos como cuadrante Este se haya mantenido siempre, simplemente para no perder información (agregación), vamos a considerar siempre 4 subreplicas (que no tienen porque mantenerse en el tiempo, es decir, la subreplica Este del plot A16 no siempre tiene porque ser la misma -no tenemos la certeza-). Teniendo eso en cuenta, generamos un acrónimo para cada cuadrante: Norte será `QN`; Sur será `QS`, Este será `QE` y oeste será `QW`. De este modo además homogeneizamos los datos con respecto a los transectos de diversidad (Transectos 1 y 2: `T1` y `T2`). 
+- Generamos el eventID y añadimos además las palabras `SERPAM` y `AMOLADERAS` para distinguir la colección de bases de datos y la base de datos. Esto tenemos que consultarlo con GBIF.   
+- El measurmenteID será del siguiente modo `EVENTID_VV`, siendo `EVENTID` el eventID y `VV` la variable medida. En el caso de abundancia y según el diccionario de variables tenemos que la abundancia se llama `A01`. 
+- Generamos los siguientes campos para la variable abundancia (ver diccionario de variables)
+
+    - `measurementType`: "abundance"
+    - `measurementUnit`: "number of individuals"
+    - `measurementMethod`: "direct count in quadrats of 50 x 50 cm"
+    - `measurementRemarks`: "https://vocabs.lter-europe.net/envthes/en/page/21541") 
+
+
+La tabla se exporta en csv en el siguiente enlace [`data/dwc_db/emof_abundances.csv`](data/dwc_db/emof_abundances.csv). Aspecto de la tabla: 
+
+```{r, echo=FALSE}
+tar_load(emof_abundances)
+DT::datatable(emof_abundances,
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+

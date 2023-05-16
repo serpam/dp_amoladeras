@@ -1,0 +1,23 @@
+---
+title: "Workflow"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tidyverse.quiet = TRUE)
+library(targets)
+library(knitr)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, out.width='100%', fig.dim=c(20,10)}
+tar_visnetwork()
+```
+
+
+```{r, results = "asis", echo = FALSE, eval=FALSE}
+cat(c("```{mermaid}", tar_mermaid(), "```"), sep = "\n")
+```

@@ -1,0 +1,97 @@
+---
+title: "Prepara datos de Abundancia"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, root.dir = "..")
+options(tidyverse.quiet = TRUE)
+```
+
+
+```{r, echo=FALSE}
+library(targets)
+library(DT)
+library(knitr)
+library(readr)
+library(glue)
+```
+
+## Introducción
+
+En este conjunto de datos estamos evaluando la variación interanual de la abundancia de *Androcymbium europaeum* en diferentes tratamientos: excluido ganado, excluido ganado + conejo, y control. 
+
+En este script vamos a preparar los datos de abundancias para acomodarlos al estándar DwC. 
+
+### Origen de los datos 
+
+En la base de datos original, se ha ejecutado la siguiente consulta: 
+
+
+```{r, echo=FALSE, comment=NA}
+tar_load(sql_abundance)
+sql_abundance
+```
+
+### Eventos temporales
+
+![](assets/dwc_event_androcymbium.png)
+
+Los eventos temporales se llamaran del siguiente modo `CSIC-EEZ:SERPAM:AMOLADERAS_A00_XX_YYYYMMDD` siendo:
+
+  - `CSIC-EEZ:SERPAM:AMOLADERAS_` el nombre de la institución-instituto (CSIC-EEZ), colección de bases de datos (SERPAM) y dataset (AMOLADERAS) 
+  - `A00`, identificador de la parcela (corresponde a una letra A y dos números)
+  - `XX`, identificador de la cuadrícula de abundancia (*e.g.* QE, QN, QS, QW) 
+  - `YYYYMMDD`: Fecha de la visita en formato YYYYMMDD
+ 
+En la siguiente tabla mostramos la cantidad de muestreos realizados en cada uno de los quadrats de 50x50: 
+
+```{r, echo=FALSE}
+tar_load(event_abundance)
+
+DT::datatable(
+  (event_abundance |> 
+  group_by(parentEventID) |> 
+  count()),
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+La tabla se exporta en csv en el siguiente enlace [`data/dwc_db/event_abundances.csv`](data/dwc_db/event_abundances.csv). 
+
+### Prepara ExtendedMeasurementOrFact (emof) de abundancias 
+
+- Los valores de abundancia se expresaran en la variable `measurementValue`
+- Formateamos el campo fecha para que aparezca en formato `YYYYMMDD` y generamos una variable llamada `measurementDeterminedDate`
+- Para generar los eventos consideraremos que cada cuadrado de 50 x 50 son subreplicas, puesto que no podemos asegurar que lo etiquetado en la base de datos como cuadrante Este se haya mantenido siempre, simplemente para no perder información (agregación), vamos a considerar siempre 4 subreplicas (que no tienen porque mantenerse en el tiempo, es decir, la subreplica Este del plot A16 no siempre tiene porque ser la misma -no tenemos la certeza-). Teniendo eso en cuenta, generamos un acrónimo para cada cuadrante: Norte será `QN`; Sur será `QS`, Este será `QE` y oeste será `QW`. De este modo además homogeneizamos los datos con respecto a los transectos de diversidad (Transectos 1 y 2: `T1` y `T2`). 
+- Generamos el eventID y añadimos además las palabras `SERPAM` y `AMOLADERAS` para distinguir la colección de bases de datos y la base de datos. Esto tenemos que consultarlo con GBIF.   
+- El measurmenteID será del siguiente modo `EVENTID_VV`, siendo `EVENTID` el eventID y `VV` la variable medida. En el caso de abundancia y según el diccionario de variables tenemos que la abundancia se llama `A01`. 
+- Generamos los siguientes campos para la variable abundancia (ver diccionario de variables)
+
+    - `measurementType`: "abundance"
+    - `measurementUnit`: "number of individuals"
+    - `measurementMethod`: "direct count in quadrats of 50 x 50 cm"
+    - `measurementRemarks`: "https://vocabs.lter-europe.net/envthes/en/page/21541") 
+
+
+La tabla se exporta en csv en el siguiente enlace [`data/dwc_db/emof_abundances.csv`](data/dwc_db/emof_abundances.csv). Aspecto de la tabla: 
+
+```{r, echo=FALSE}
+tar_load(emof_abundances)
+DT::datatable(emof_abundances,
+              rownames = FALSE,
+              filter = 'top',
+              options = list(
+                pageLength = 20, 
+                autoWidth = TRUE
+              ))
+```
+
+
+
