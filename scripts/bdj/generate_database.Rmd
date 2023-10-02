@@ -1,0 +1,249 @@
+---
+title: "Download and process the dataset from GBIF"
+author: '[Antonio J. Pérez-Luque](https://github.com/ajpelu) <a href="https://orcid.org/0000-0002-1747-0469" target="orcid.widget">
+<img alt="ORCID logo" src="https://info.orcid.org/wp-content/uploads/2019/11/orcid_16x16.png" width="16" height="16" /></a>'
+date: "2023-08-22"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction 
+
+This document outlines the process of downloading, processing, and analyzing data from the GBIF dataset *Monitoring data on the effect of domestic livestock and rabbits on Androcymbium europaeum pastures*. The dataset contains information about the annual monitoring of the effect of herbivorism on the conservation status of endangered species *Androcymbium europaeum*. 
+
+## Dataset features 
+The dataset *Monitoring data on the effect of domestic livestock and rabbits on Androcymbium europaeum pastures* is deposited in GBIF. It can be access at [doi:10.15470/jpjhuu](https://doi.org/10.15470/jpjhuu) and [here](https://www.gbif.org/dataset/340aff40-1745-4d49-bf2a-adb2899bc428). 
+
+Since 2010, the SERPAM Department (Evaluation, Restoration and Protection of Mediterranean Agrosystems Service) of the Zaidin Experimental Station belonging to Spanish National Research Council (CSIC-EEZ), has been carrying out annual sampling to evaluate the effect of domestic and wild livestock (*eg*. rabbits) on the pastures inhabited by *Androcymbium europaeum*. A randomized block design with three treatments (type of management: rabbit and domestic herbivorism; only excluded to livestock; and excluded to rabbit and livestock) was performed. In each treatment, two types of monitoring were carried out: abundance estimation of *A. europaeum* by counting individuals on 50 x 50 cm squares; and plant species diversity in 2-m long transects using the modified Point-Quadrat method. This study was carried out in the "Rambla de las Amoladeras" (Almería) within the Cabo de Gata-Níjar protected area (southern Spain). 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE, 
+                      warning = FALSE)
+```
+
+# Downloading and Extracting Data
+
+First, we download and extract the dataset from the GBIF server. For this we used the url included in the GBIF's dataset page, specifically we download the source archive (in Darwin Core Archive format). The url of this dataset is https://ipt.gbif.es/archive.do?r=amoladeras. After the donwload the file is unnzipped and stored in a temporary directory. 
+
+```{r}
+library("tidyverse")
+library("sf")
+library("datamodelr")
+```
+
+```{r, message=FALSE}
+gbif_url <- 'https://ipt.gbif.es/archive.do?r=amoladeras' 
+
+# Create a temporary directory for storing files
+temp <- tempdir()
+f <- paste0(temp, "/amoladeras.zip")
+extract_dir <- paste0(temp, "/amoladeras")
+
+# Download the dataset
+download.file(gbif_url, destfile = f, method = "auto")
+
+# Unzip the downloaded file
+unzip(f, exdir = extract_dir)
+
+# Display the list of extracted files
+list.files(extract_dir)
+
+# Read the occurrence, event, and extended measurementOrFact files
+occ <- read_delim(file = paste0(extract_dir, "/occurrence.txt"))
+event <- read_delim(file = paste0(extract_dir, "/event.txt"))
+emof <- read_delim(file = paste0(extract_dir, "/extendedmeasurementorfact.txt"))
+```
+
+
+# GBIF Dataset Structure
+Before diving into data processing, it's important to understand the structure of the dataset.
+The structure of the dataset in GBIF is represented in the following schema: 
+
+```{r, echo=FALSE}
+col_scheme <-
+  dm_color_scheme(
+    blue = dm_palette(
+      line_color = "#41719C",
+      header_bgcolor = "#5B9BD5",
+      header_font = "#FFFFFF",
+      bgcolor = "#D6E1F1"
+    ),
+    yellow = dm_palette(
+      line_color = "#BC8C00",
+      header_bgcolor = "#FFC000",
+      header_font = "#FFFFFF",
+      bgcolor = "#FFEAD0"
+    )
+  )
+
+dm_f <- dm_from_data_frames(occ, emof, event) |> 
+  dm_add_references(
+  event$id == emof$id,
+  event$eventID == occ$eventID,
+  occ$id == event$id,
+  event$parentEventID == event$eventID)
+
+dm_add_colors(col_scheme)
+
+dm_f <- dm_set_display(dm_f, display = list(
+  blue = "event",
+  yellow = c("occ", "emof")))
+
+graph <- dm_create_graph(dm_f, rankdir = "RL", col_attr = c("column"), view_type = "all", columnArrows = TRUE)
+dm_render_graph(graph)
+```
+
+
+
+INCLUIR IMÁGENES 
+
+To evaluate the effect of sheep and rabbits on the population of A. europaeum and its plant communities, 18 plots of 2.5 m x 2.5 m were installed in the study area (Fig. 2). A randomized block design was followed, and consisted of 6 blocks separated between 300 and 400 m, with three different treatments or management types (one plot by treatment and block): 1) with herbivory by sheep and rabbits (G+R+), 2) excluding only sheep (G-R+) (fenced with hunting netting) and 3) excluding rabbits and sheep (G-R-) (fenced with rhomboidal netting of 4 cm of light). Within each plot, the density of A. europaeum in each plot and year was evaluated by counting the number of individuals in 50 cm x 50 cm fixed squares, taking four squares per plot, distributed according to the four cardinal points (N, S, E and W): 24 squares per treatment (six blocks by four squares). The exclusion plots were installed in May 2010, after the first density sampling (March), thus this year should be considered as year zero, without exclusion treatments. The density of A. europaeum was assessed between January and March, depending on the species phenology.
+
+
+
+## Getting Data for Plots
+Next, we extract and process data related to plots from the dataset.
+
+
+```{r}
+# Filter events to obtain only the top-level plots
+raw_plots <- event |> 
+  filter(is.na(parentEventID)) |> 
+  mutate(id_plot = str_remove(eventID, "CSIC-EEZ:SERPAM:AMOLADERAS_")) |>
+  dplyr::select(id_plot, eventID, fieldNumber, treatment_desc = fieldNotes, footprintWKT) |> 
+  separate(fieldNumber, into = c("block", "treatment"), sep = " \\| ") 
+
+# Convert to spatial data if needed
+geo_plots <- raw_plots |> 
+  st_as_sf(wkt = "footprintWKT", crs = 25830) 
+
+# Create a dataframe without spatial information
+plots <- raw_plots |> dplyr::select(-footprintWKT)
+
+rm(raw_plots)
+```
+
+## Getting Data for Quadrats
+We proceed to extract and process data related to quadrats.
+
+```{r}
+# Filter events to obtain only quadrat-related data
+raw_quadrats <- event |> 
+  filter(samplingProtocol == "Quadrat count") |> 
+  filter(parentEventID %in% plots$eventID) |> 
+  mutate(id_quadrat = str_sub(eventID, -2)) |> 
+  mutate(id_plot = str_remove(parentEventID, "CSIC-EEZ:SERPAM:AMOLADERAS_")) |>
+  dplyr::select(id_quadrat, id_plot, eventID, fieldNumber, treatment_desc = fieldNotes, footprintWKT) |> 
+  separate(fieldNumber, into = c("block", "treatment"), sep = " \\| ") 
+
+# Convert to spatial data if needed
+geo_quadrats <- raw_quadrats |> 
+  st_as_sf(wkt = "footprintWKT", crs = 25830) 
+
+# Create a dataframe without spatial information
+quadrats <- raw_quadrats |> dplyr::select(-footprintWKT)
+
+rm(raw_quadrats)
+```
+
+## Getting Data for Transects
+We now extract and process data related to transects.
+
+```{r}
+# Filter events to obtain only transect-related data
+raw_transects <- event |> 
+  filter(samplingProtocol == "Point Quadrat Transect") |> 
+  filter(parentEventID %in% plots$eventID) |> 
+  mutate(id_transect = str_sub(eventID, -2)) |> 
+  mutate(id_plot = str_remove(parentEventID, "CSIC-EEZ:SERPAM:AMOLADERAS_")) |>
+  dplyr::select(id_transect, id_plot, eventID, fieldNumber, treatment_desc = fieldNotes, footprintWKT) |> 
+  separate(fieldNumber, into = c("block", "treatment"), sep = " \\| ") 
+
+# Convert to spatial data if needed
+geo_transects <- raw_transects |> 
+  st_as_sf(wkt = "footprintWKT", crs = 25830) 
+
+# Create a dataframe without spatial information
+transects <- raw_transects |> dplyr::select(-footprintWKT)
+
+rm(raw_transects)
+```
+
+
+## Data Processing for Quadrat Count and Measurements
+With the data extracted, we proceed to process the events and measurements related to quadrat counts.
+
+```{r}
+# Process events for quadrat counts
+quadrats_event <- event |> 
+  filter(samplingProtocol == "Quadrat count") |> 
+  filter(parentEventID %in% quadrats$eventID) |> 
+  mutate(date = lubridate::ymd(eventDate)) |> 
+  dplyr::select(id, parentEventID, date)
+
+# Process measurements for quadrat counts
+quadrats_measurements <- 
+  emof |> 
+  filter(id %in% quadrats_event$id) |> 
+  dplyr::select(id, abundance = measurementValue)
+
+# Occurrence data for quadrat counts
+quadrats_occ <- 
+  occ |> 
+  filter(id %in% quadrats_event$id) |> 
+  dplyr::select(id, species = scientificName)
+
+# Combine event, measurement, and occurrence data for quadrat counts
+df_abundances <- 
+  quadrats_event |> 
+  inner_join(quadrats_measurements, by = "id") |> 
+  inner_join(quadrats_occ, by = "id") |> 
+  inner_join(quadrats, by = c("parentEventID" = "eventID")) |> 
+  dplyr::select(
+    id_plot, id_quadrat, block, treatment, treatment_desc, date, abundance, species
+  )
+
+```
+
+## Data Processing for Transect Measurements
+Similarly, we process the events and measurements related to transects. 
+
+```{r}
+# Process events for transects
+transects_event <- event |> 
+  filter(samplingProtocol == "Point Quadrat Transect") |> 
+  filter(parentEventID %in% transects$eventID) |> 
+  mutate(date = lubridate::ymd(eventDate)) |> 
+  dplyr::select(id, parentEventID, date)
+
+# Process measurements for transects
+transects_measurements <- 
+  emof |> 
+  filter(id %in% transects_event$id) |> 
+  filter(measurementType != "specific vegetation cover") |> 
+  dplyr::select(id, measurementType, measurementValue) |> 
+  pivot_wider(names_from = measurementType, values_from = measurementValue)
+
+# Combine event, measurement, and occurrence data for transects
+df_transects <- 
+  transects_event |> 
+  inner_join(transects_measurements, by = "id") |> 
+  inner_join(transects, by = c("parentEventID" = "eventID")) |> 
+  dplyr::select(
+    id_plot, id_transect, block:treatment_desc, 
+    date, 
+    `bare soil cover`:`diversity index`
+  )
+```
+
+## Conclusion
+At this point, we have successfully extracted, processed, and organized the data from the GBIF dataset. Further analysis and visualization can be performed using the df_abundances and df_transects dataframes.
+
+
+
+
+
+
