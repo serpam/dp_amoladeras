@@ -148,9 +148,9 @@ list(
       write.csv(emof_sps, "data/dwc_db/emof_sps.csv")
       write.csv(occ_abundances, "data/dwc_db/occ_abundances.csv")
       write.csv(occ_sps, "data/dwc_db/occ_sps.csv")
-      write.csv(combine_emof, "data/dwca/emof.csv")
-      write.csv(combine_occ, "data/dwca/occ.csv")
-      write.csv(combine_events, "data/dwca/events.csv")
+      write.csv(combine_emof, "data/dwca/emof.csv", row.names = FALSE)
+      write.csv(combine_occ, "data/dwca/occ.csv", row.names = FALSE)
+      write.csv(combine_events, "data/dwca/events.csv", row.names = FALSE)
     }
   ),
 

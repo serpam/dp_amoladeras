@@ -60,7 +60,9 @@ prepare_transects <- function(x) {
 
 # Genera WKT from geoinfo
 genera_wkt <- function(geo_file) {
-  x <- sf::st_read(geo_file) |> janitor::clean_names()
+  x <- sf::st_read(geo_file) |>
+    janitor::clean_names() |>
+    st_transform(4326)
 
   wkt <- x |>
     mutate(wkt = st_as_text(geometry)) |>
@@ -94,7 +96,7 @@ genera_event_parcelas_aux <- function(df) {
       samplingProtocol = "",
       sampleSizeValue = NA,
       sampleSizeUnit = "",
-      footprintSRS = "epsg:25830",
+      footprintSRS = "epsg:4326",
       countryCode = "ES",
       stateProvinde = "AL",
       municipality = "Cabo de Gata",
@@ -127,7 +129,7 @@ genera_event_subplot_aux <- function(df, parcelas_event_aux) {
       samplingProtocol = "Quadrat count",
       sampleSizeValue = 0.25,
       sampleSizeUnit = "m^2",
-      footprintSRS = "epsg:25830",
+      footprintSRS = "epsg:4326",
       countryCode = "ES",
       stateProvinde = "AL",
       municipality = "Cabo de Gata",
@@ -159,7 +161,7 @@ genera_event_transect_aux <- function(df, parcelas_event_aux) {
       samplingProtocol = "Point Quadrat Transect",
       sampleSizeValue = 2,
       sampleSizeUnit = "m",
-      footprintSRS = "epsg:25830",
+      footprintSRS = "epsg:4326",
       countryCode = "ES",
       stateProvinde = "AL",
       municipality = "Cabo de Gata",
@@ -212,7 +214,7 @@ genera_event_transects <- function(aux_transecto) {
       samplingProtocol = "Point Quadrat Transect",
       sampleSizeValue = 2,
       sampleSizeUnit = "m",
-      footprintSRS = "epsg:25830",
+      footprintSRS = "epsg:4326",
       footprintWKT = "",
       countryCode = "",
       stateProvinde = "",
@@ -459,7 +461,7 @@ get_validated_taxonomy <- function(file){
     dplyr::select(
       taxa_consulted,
       scientificname,
-      kingdom, phylum, order, family, class, genus
+      kingdom, phylum, order, family, class, genus, rank
     )
   return(x)
   }
@@ -483,7 +485,7 @@ genera_occ_abundance <- function(event_abundance, taxa_validated) {
     ) |>
     dplyr::select(occurrenceID, eventID, basisOfRecord, institutionCode, collectionCode,
                   datasetName, ownerInstitutionCode, language, scientificName = scientificname,
-                  kingdom, phylum, class, order, family, genus)
+                  kingdom, phylum, class, order, family, genus, taxonRank = rank)
 
   return(andro_occ)
 }
@@ -510,7 +512,7 @@ genera_occ_sps <- function(occurrences_transectos, taxa_validate){
              eventID) |>
       dplyr::select(
         occurrenceID, basisOfRecord, institutionCode, collectionCode, datasetName, ownerInstitutionCode, language,
-        scientificName = scientificname, kingdom:genus)
+        scientificName = scientificname, kingdom:genus, taxonRank = rank)
     return(occ_sps)
 
 }
